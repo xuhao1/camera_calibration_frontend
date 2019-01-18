@@ -46,9 +46,13 @@ import random
 import sensor_msgs.msg
 import tarfile
 import time
+import os, sys
 from distutils.version import LooseVersion
-
+import subprocess
+from shutil import copyfile
 import numpy
+from subprocess import Popen, PIPE
+import random
 
 # Supported calibration patterns
 class Patterns:
@@ -1091,21 +1095,32 @@ class StereoCalibrator(Calibrator):
                                          rdownsampled_corners, True)
 
             # Add sample to database only if it's sufficiently different from any previous sample
-            if lcorners is not None and rcorners is not None:
+            if lcorners is not None:
                 params = self.get_parameters(lcorners, lboard, (lgray.shape[1], lgray.shape[0]))
                 if self.is_good_sample(params):
                     self.db.append( (params, lgray, rgray) )
-                    self.good_corners.append( (lcorners, rcorners, lboard) )
-                    print(("*** Added sample %d, p_x = %.3f, p_y = %.3f, p_size = %.3f, skew = %.3f" % tuple([len(self.db)] + params)))
+                    print(("*** Added Left sample %d, p_x = %.3f, p_y = %.3f, p_size = %.3f, skew = %.3f" % tuple([len(self.db)] + params)))
+            elif rcorners is not None:
+                params = self.get_parameters(rcorners, rboard, (rgray.shape[1], rgray.shape[0]))
+                if self.is_good_sample(params):
+                    self.db.append( (params, rgray, rgray) )
+                    print(("*** Added right sample %d, p_x = %.3f, p_y = %.3f, p_size = %.3f, skew = %.3f" % tuple([len(self.db)] + params)))
 
-                    if self.accu_image is None:
-                        self.accu_image = numpy.zeros(lgray.shape, numpy.uint8)
-                    else:
-                        pts = numpy.array([ ldownsampled_corners[0][0],
-                                            ldownsampled_corners[lboard.n_cols-1][0],
-                                            ldownsampled_corners[-1][0],
-                                            ldownsampled_corners[-(lboard.n_cols)][0]], numpy.int32)
-                        cv2.polylines(self.accu_image, [pts], isClosed=True, color=(0,0,255), thickness=1, lineType=8)
+            # if lcorners is not None and rcorners is not None:
+            #     params = self.get_parameters(lcorners, lboard, (lgray.shape[1], lgray.shape[0]))
+            #     if self.is_good_sample(params):
+            #         self.db.append( (params, lgray, rgray) )
+            #         self.good_corners.append( (lcorners, rcorners, lboard) )
+            #         print(("*** Added sample %d, p_x = %.3f, p_y = %.3f, p_size = %.3f, skew = %.3f" % tuple([len(self.db)] + params)))
+
+            #         if self.accu_image is None:
+            #             self.accu_image = numpy.zeros(lgray.shape, numpy.uint8)
+            #         else:
+            #             pts = numpy.array([ ldownsampled_corners[0][0],
+            #                                 ldownsampled_corners[lboard.n_cols-1][0],
+            #                                 ldownsampled_corners[-1][0],
+            #                                 ldownsampled_corners[-(lboard.n_cols)][0]], numpy.int32)
+            #             cv2.polylines(self.accu_image, [pts], isClosed=True, color=(0,0,255), thickness=1, lineType=8)
 
         rv = StereoDrawable()
         rv.lscrib = lscrib
@@ -1120,20 +1135,68 @@ class StereoCalibrator(Calibrator):
             
         return rv
 
-    def do_calibration(self, dump = False):
-        # TODO MonoCalibrator collects corners if needed here
-        # Dump should only occur if user wants it
-        if dump:
-            pickle.dump((self.is_mono, self.size, self.good_corners),
-                        open("/tmp/camera_calibration_%08x.pickle" % random.getrandbits(32), "w"))
-        self.size = (self.db[0][1].shape[1], self.db[0][1].shape[0]) # TODO Needs to be set externally
-        self.l.size = self.size
-        self.r.size = self.size
-        self.cal_fromcorners(self.good_corners)
-        self.calibrated = True
-        # DEBUG
-        print((self.report()))
-        print((self.ost()))
+    # def do_calibration(self, dump = False):
+    #     # TODO MonoCalibrator collects corners if needed here
+    #     # Dump should only occur if user wants it
+    #     if dump:
+    #         pickle.dump((self.is_mono, self.size, self.good_corners),
+    #                     open("/tmp/camera_calibration_%08x.pickle" % random.getrandbits(32), "w"))
+    #     self.size = (self.db[0][1].shape[1], self.db[0][1].shape[0]) # TODO Needs to be set externally
+    #     self.l.size = self.size
+    #     self.r.size = self.size
+    #     self.cal_fromcorners(self.good_corners)
+    #     self.calibrated = True
+    #     # DEBUG
+    #     print((self.report()))
+    #     print((self.ost()))
+    def calib_by_vins_estimator(self, dir):
+        cmd = "/opt/ros/kinetic/bin/rosrun camera_model Calibration -w 8 -h 12 -s 80 --camera-mode mei -i {} -p cap".format(dir).split(" ")
+        print(cmd)
+        print("\n\n\n\n-----------------start-calib------------------\n\n\n")
+        process = Popen(cmd, stdout=sys.stdout, stderr=sys.stdin, cwd="/home/dji/camera_calib")
+        (output, err) = process.communicate()
+        exit_code = process.wait()
+        print("\n\n\n--------------------end-calib----------------------\n\n\n")
+
+        print(output, err, exit_code)
+        return exit_code == 0
+
+    def save_config_to(self, target):
+        copyfile("/home/dji/camera_calib/camera_camera_calib.yaml", target)
+    def do_save(self):
+        imgs_left = [("cap-%06d.png"  % random.randint(0, 1000000), im) for i,(_, im, _) in enumerate(self.db)]
+        imgs_right = [("cap-%06d.png" % random.randint(0, 1000000), im) for i,(_, _, im) in enumerate(self.db)]
+
+        self.save_to_dir(imgs_left, "/home/dji/camera_calib/calib-left/")
+        print("Saved left to /home/dji/camera_calib/calib-left")
+
+        self.save_to_dir(imgs_right, "/home/dji/camera_calib/calib-right/")
+        print("Saved right to /home/dji/camera_calib/calib-right")
+
+        print("\n\n\nCalibrating left")
+        if self.calib_by_vins_estimator("/home/dji/camera_calib/calib-left"):
+            self.save_config_to("/home/dji/SwarmConfig/dji_stereo/left.yaml")
+            print("Saved config to /home/dji/SwarmConfig/dji_stereo/left.yaml")
+        else:
+            print("Calib left failed, not saving")
+
+        print("\n\n\nCalibrating right")
+        if self.calib_by_vins_estimator("/home/dji/camera_calib/calib-right/"):
+            self.save_config_to("/home/dji/SwarmConfig/dji_stereo/right.yaml")
+            print("Saved config to /home/dji/SwarmConfig/dji_stereo/right.yaml")
+        else:
+            print("Calib right failed, not saving") 
+
+    def save_to_dir(self, imgs, path):
+        try:
+            os.mkdir(path)
+        except:
+            print("Dir exists")
+            pass
+        
+        for (name, im) in imgs:
+            cv2.imwrite(path+name, im)
+
 
     def do_tarfile_save(self, tf):
         """ Write images and calibration solution to a tarfile object """
@@ -1165,3 +1228,4 @@ class StereoCalibrator(Calibrator):
         ##\todo Check that the filenames match and stuff
 
         self.cal(limages, rimages)
+    

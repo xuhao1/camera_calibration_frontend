@@ -1,7 +1,7 @@
 <launch>
 	<arg name="chessboard_w" default="8"/>
-	<arg name="chessboard_h" default="9"/>
-	<arg name="square_size"  default="0.07"/>
+	<arg name="chessboard_h" default="12"/>
+	<arg name="square_size"  default="0.08"/>
 	<arg name="use_stereo" default="false" />
 
 	<node unless="$(arg use_stereo)" pkg="camera_calibration_frontend" type="cameracalibrator.py" name="cameracalibrator" ns="/camera"

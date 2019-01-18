@@ -144,9 +144,9 @@ class CalibrationNode:
 
         self.c = None
 
-        mth = ConsumerThread(self.q_mono, self.handle_monocular)
-        mth.setDaemon(True)
-        mth.start()
+        # mth = ConsumerThread(self.q_mono, self.handle_monocular)
+        # mth.setDaemon(True)
+        # mth.start()
 
         sth = ConsumerThread(self.q_stereo, self.handle_stereo)
         sth.setDaemon(True)
@@ -185,7 +185,7 @@ class CalibrationNode:
             else:
                 self.c = StereoCalibrator(self._boards, self._calib_flags, self._pattern,
                                           checkerboard_flags=self._checkerboard_flags)
-
+        
         drawable = self.c.handle_msg(msg)
         self.displaywidth = drawable.lscrib.shape[1] + drawable.rscrib.shape[1]
         self.redraw_stereo(drawable)
@@ -254,6 +254,7 @@ class OpenCVCalibrationNode(CalibrationNode):
                     self.c.do_calibration()
             
             if 280 <= y < 380:
+                print(self.c)
                 self.c.do_save()
 
             if self.c.calibrated:
