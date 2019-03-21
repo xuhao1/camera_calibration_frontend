@@ -1150,7 +1150,7 @@ class StereoCalibrator(Calibrator):
     #     print((self.report()))
     #     print((self.ost()))
     def calib_by_vins_estimator(self, dir):
-        cmd = "/opt/ros/kinetic/bin/rosrun camera_model Calibration -w 8 -h 12 -s 80 --camera-mode mei -i {} -p cap".format(dir).split(" ")
+        cmd = "/opt/ros/kinetic/bin/rosrun camera_models Calibrations -w 8 -h 12 -s 80 --camera-model mei -i {} -p cap".format(dir).split(" ")
         print(cmd)
         print("\n\n\n\n-----------------start-calib------------------\n\n\n")
         process = Popen(cmd, stdout=sys.stdout, stderr=sys.stdin, cwd="/home/dji/camera_calib")

@@ -6,7 +6,7 @@
 
 	<node pkg="camera_calibration_frontend" type="cameracalibrator.py" name="cameracalibratorstereo"
 		args="--size $(arg chessboard_w)x$(arg chessboard_h) --square $(arg square_size)" output="screen">
-		<remap from="right" to="/stereo/right/image" />
-		<remap from="left" to="/stereo/left/image" />
+		<remap from="right" to="/mynteye/right/image_raw" />
+		<remap from="left" to="/mynteye/left/image_raw" />
 	</node>
 </launch>
